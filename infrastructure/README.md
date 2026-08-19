@@ -14,9 +14,9 @@ Terraform de este proyecto, organizado en 3 capas:
   módulos con otro `.tfvars`.
 
 ¿Prefieres ver qué crea cada módulo pero clic a clic en la consola de AWS
-en vez de en HCL? Está todo en
-[`AWS-CONSOLE-WALKTHROUGH.md`](AWS-CONSOLE-WALKTHROUGH.md) — solo con
-fines educativos, el despliegue real sigue siendo con Terraform.
+en vez de en HCL? Está todo en [`WALKTHROUGH.md`](../WALKTHROUGH.md) —
+el proyecto de principio a fin, solo con fines educativos, el despliegue
+real sigue siendo con Terraform.
 
 ## Orden de aplicación
 

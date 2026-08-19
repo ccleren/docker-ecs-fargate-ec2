@@ -1,42 +1,79 @@
-# 🖱️ CloudPulse a mano, desde la consola de AWS
+# 🖱️ CloudPulse de principio a fin — clic a clic / comando a comando
 
-Este documento es **puramente educativo**: reconstruye, clic a clic en la
-consola de AWS, exactamente lo que crean los 10 módulos de Terraform de
-este repositorio — para entender qué hace `terraform apply` por debajo.
+Esta guía construye **todo el proyecto**, desde cero hasta tener las 3 apps
+sirviendo detrás del ALB — sin usar Terraform. En cada paso tienes el camino
+de clics en la consola de AWS **y** el comando de AWS CLI equivalente, para
+entender exactamente qué hace cada pieza.
 
-> ⚠️ **No es el método de despliegue real de este proyecto.** El repositorio
-> se despliega con Terraform (`infrastructure/environments/prod`) y el
-> workflow de CI/CD. Si sigues esta guía y luego quieres traspasar la
-> infraestructura a Terraform, tendrías que hacer `terraform import` de cada
-> recurso — no lo cubrimos aquí. Úsala para entender el "por qué" de cada
-> pieza, o para reconstruir una versión mínima de prueba sin tocar Terraform.
+> ⚠️ **Esto es material educativo, no el método de despliegue real del
+> repositorio.** El proyecto se despliega con Terraform
+> (`infrastructure/environments/prod`) automatizado por GitHub Actions —
+> ver [`README.md`](README.md) e [`infrastructure/README.md`](infrastructure/README.md).
+> Sigue esta guía para entender el "por qué" de cada recurso, para una
+> prueba puntual, o como referencia si algo falla y necesitas depurarlo
+> manualmente. Si repites estos pasos y luego quieres pasar la
+> infraestructura a Terraform, tendrías que hacer `terraform import` de
+> cada recurso — no se cubre aquí.
 
-Cada paso incluye el camino de clics en la consola **y** el comando
-equivalente de AWS CLI, para que veas la correspondencia entre ambos.
-Todos los comandos asumen la región `us-east-1` — cámbiala si usas otra.
-
----
-
-## 0. Antes de empezar
-
-- Ten a mano tu `<AWS_ACCOUNT_ID>` (esquina superior derecha de la consola,
-  o `aws sts get-caller-identity`).
-- Un dominio real que controles, si vas a completar los pasos de Route 53
-  y ACM.
-- Guarda cada ID que vayas generando (VPC ID, subnet IDs, SG IDs...): los
-  necesitarás en pasos posteriores. En la CLI, casi todos los `create-*`
-  devuelven el ID en la respuesta JSON.
+Todos los comandos asumen la región `us-east-1`; cámbiala si usas otra.
+Guarda cada ID que generes (VPC ID, subnet IDs, ARNs...) — los necesitarás
+en pasos posteriores. Casi todos los `create-*` de la CLI devuelven el ID
+en la respuesta JSON.
 
 ---
 
-## 1. VPC y red
+## 0. Prerrequisitos
 
-### 1.1 VPC
+- Cuenta de AWS con permisos de administrador, AWS CLI configurado
+  (`aws sts get-caller-identity` debe funcionar) y `<AWS_ACCOUNT_ID>` a mano.
+- Docker instalado.
+- Un dominio real que controles (para los pasos de Route 53 y ACM).
+- Clona el repositorio:
+  ```bash
+  git clone https://github.com/ccleren/docker-ecs-fargate-ec2.git
+  cd docker-ecs-fargate-ec2
+  ```
+
+---
+
+## 1. Backend remoto (equivalente a `infrastructure/bootstrap`)
+
+**Consola**: S3 → **Create bucket** → nombre único, ej.
+`cloudpulse-terraform-state` → *Bucket Versioning*: Enable → *Default
+encryption*: SSE-S3 → *Block all public access*: activado (por defecto).
+
+DynamoDB → **Create table** → nombre `cloudpulse-terraform-locks` →
+partition key `LockID` (String) → *Table class*: on-demand.
+
+**CLI**:
+```bash
+aws s3api create-bucket --bucket cloudpulse-terraform-state --region us-east-1
+aws s3api put-bucket-versioning --bucket cloudpulse-terraform-state \
+  --versioning-configuration Status=Enabled
+aws s3api put-bucket-encryption --bucket cloudpulse-terraform-state \
+  --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
+aws s3api put-public-access-block --bucket cloudpulse-terraform-state \
+  --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+
+aws dynamodb create-table --table-name cloudpulse-terraform-locks \
+  --attribute-definitions AttributeName=LockID,AttributeType=S \
+  --key-schema AttributeName=LockID,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST
+```
+
+> Si vas a usar Terraform de verdad más adelante, este paso es literalmente
+> lo que hace `infrastructure/bootstrap`. Aquí no vuelve a usarse en el
+> resto de la guía — es solo para dejar constancia de qué crea.
+
+---
+
+## 2. Red (VPC)
+
+### 2.1 VPC
 
 **Consola**: VPC → *Your VPCs* → **Create VPC** → "VPC only" → IPv4 CIDR
-`10.0.0.0/16` → habilita *DNS hostnames* y *DNS resolution* en la pestaña
-de configuración tras crearla (**Actions → Edit VPC settings**) → nombre
-`cloudpulse-vpc`.
+`10.0.0.0/16` → tras crearla, **Actions → Edit VPC settings** → habilita
+*DNS hostnames* y *DNS resolution* → nombre `cloudpulse-vpc`.
 
 **CLI**:
 ```bash
@@ -46,12 +83,11 @@ aws ec2 modify-vpc-attribute --vpc-id <VPC_ID> --enable-dns-hostnames
 aws ec2 modify-vpc-attribute --vpc-id <VPC_ID> --enable-dns-support
 ```
 
-### 1.2 DHCP Options Set
+### 2.2 DHCP Options Set
 
 **Consola**: VPC → *DHCP option sets* → **Create DHCP option set** →
 domain name `ec2.internal`, DNS servers `AmazonProvidedDNS` → tras
-crearlo, VPC → *Your VPCs* → selecciona la VPC → **Actions → Edit DHCP
-options set** → elige el que acabas de crear.
+crearlo, en la VPC → **Actions → Edit DHCP options set** → selecciónalo.
 
 **CLI**:
 ```bash
@@ -60,7 +96,7 @@ aws ec2 create-dhcp-options --dhcp-configurations \
 aws ec2 associate-dhcp-options --dhcp-options-id <DHCP_OPTIONS_ID> --vpc-id <VPC_ID>
 ```
 
-### 1.3 Subredes (2 públicas + 2 privadas, 2 AZs)
+### 2.3 Subredes (2 públicas + 2 privadas, 2 AZs)
 
 **Consola**: VPC → *Subnets* → **Create subnet**, repite 4 veces:
 
@@ -71,10 +107,10 @@ aws ec2 associate-dhcp-options --dhcp-options-id <DHCP_OPTIONS_ID> --vpc-id <VPC
 | `cloudpulse-private-us-east-1a` | `10.0.3.0/24` | us-east-1a |
 | `cloudpulse-private-us-east-1b` | `10.0.4.0/24` | us-east-1b |
 
-En las dos públicas: selecciona la subred → **Actions → Edit subnet
-settings** → activa *Auto-assign public IPv4 address*.
+En las dos públicas: **Actions → Edit subnet settings** → activa
+*Auto-assign public IPv4 address*.
 
-**CLI** (una de las 4, repite con los otros valores):
+**CLI** (repite con los otros 3 juegos de valores):
 ```bash
 aws ec2 create-subnet --vpc-id <VPC_ID> --cidr-block 10.0.1.0/24 \
   --availability-zone us-east-1a \
@@ -82,10 +118,10 @@ aws ec2 create-subnet --vpc-id <VPC_ID> --cidr-block 10.0.1.0/24 \
 aws ec2 modify-subnet-attribute --subnet-id <SUBNET_ID> --map-public-ip-on-launch
 ```
 
-### 1.4 Internet Gateway
+### 2.4 Internet Gateway
 
 **Consola**: VPC → *Internet gateways* → **Create internet gateway** →
-nombre `cloudpulse-igw` → selecciónalo → **Actions → Attach to VPC**.
+nombre `cloudpulse-igw` → **Actions → Attach to VPC**.
 
 **CLI**:
 ```bash
@@ -94,7 +130,7 @@ aws ec2 create-internet-gateway \
 aws ec2 attach-internet-gateway --internet-gateway-id <IGW_ID> --vpc-id <VPC_ID>
 ```
 
-### 1.5 NAT Gateway
+### 2.5 NAT Gateway
 
 **Consola**: VPC → *NAT gateways* → **Create NAT gateway** → subred =
 `cloudpulse-public-us-east-1a` → *Connectivity type*: Public → **Allocate
@@ -108,12 +144,12 @@ aws ec2 create-nat-gateway --subnet-id <PUBLIC_SUBNET_A_ID> \
   --tag-specifications 'ResourceType=natgateway,Tags=[{Key=Name,Value=cloudpulse-nat}]'
 ```
 
-### 1.6 Route tables
+### 2.6 Route tables
 
 **Consola**: VPC → *Route tables* → **Create route table** (pública) →
-nombre `cloudpulse-public-rt` → *Routes* → **Edit routes** → añade
-`0.0.0.0/0` → target = tu Internet Gateway → *Subnet associations* →
-asocia las 2 subredes públicas.
+nombre `cloudpulse-public-rt` → **Edit routes** → añade `0.0.0.0/0` →
+target = tu Internet Gateway → *Subnet associations* → asocia las 2
+subredes públicas.
 
 Repite para la privada: `cloudpulse-private-rt`, ruta `0.0.0.0/0` → target
 = tu NAT Gateway → asocia las 2 subredes privadas.
@@ -137,13 +173,13 @@ aws ec2 associate-route-table --route-table-id <PRIVATE_RT_ID> --subnet-id <PRIV
 
 ---
 
-## 2. Security groups
+## 3. Security groups
 
 **Consola**: EC2 → *Security groups* → **Create security group**, tres
 veces:
 
 - **`cloudpulse-alb-sg`** — inbound: TCP 80 desde `0.0.0.0/0`, TCP 443
-  desde `0.0.0.0/0`. Outbound: todo (regla por defecto).
+  desde `0.0.0.0/0`.
 - **`cloudpulse-ecs-instance-sg`** — inbound: TCP 0-65535, source =
   security group `cloudpulse-alb-sg` (no un CIDR).
 - **`cloudpulse-workstation-sg`** *(opcional)* — inbound: TCP 22 desde tu
@@ -166,14 +202,12 @@ aws ec2 authorize-security-group-ingress --group-id <ECS_SG_ID> \
 
 ---
 
-## 3. ECR — repositorios de imágenes
+## 4. ECR — repositorios de imágenes
 
 **Consola**: ECR → *Repositories* → **Create repository**, tres veces
 (`web`, `status`, `docs`):
-- Visibility: Private
-- Tag immutability: **Enabled**
-- Scan on push: **Enabled**
-- Encryption: AES-256 (por defecto)
+- Visibility: Private · Tag immutability: **Enabled** · Scan on push:
+  **Enabled** · Encryption: AES-256 (por defecto).
 
 Tras crear cada uno: pestaña **Lifecycle policy** → **Create rule** →
 "Expire images" → *Image count more than* `10` → *Any tags*.
@@ -197,7 +231,33 @@ aws ecr put-lifecycle-policy --repository-name web --lifecycle-policy-text '{
 
 ---
 
-## 4. Route 53 — hosted zone
+## 5. Build y push de las 3 imágenes Docker
+
+Con los 3 repositorios ya creados, construye y sube cada app (`web`,
+`status`, `docs`) desde la raíz del repositorio:
+
+**No hay equivalente "clic en consola"** para este paso — construir
+imágenes es intrínsecamente un comando, no una acción de la consola de AWS
+(subirlas sí podrías hacerlo arrastrando un `.tar` desde algún sitio, pero
+nadie lo hace así; el flujo real siempre es `docker build` + `docker push`).
+
+```bash
+aws ecr get-login-password --region us-east-1 \
+  | docker login --username AWS --password-stdin <AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com
+
+for service in web status docs; do
+  docker build -t "$service" "./apps/$service"
+  docker tag "$service:latest" "<AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/$service:latest"
+  docker push "<AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/$service:latest"
+done
+```
+
+Verifica que llegaron: ECR → cada repositorio → pestaña *Images* debe
+mostrar el tag `latest`. O por CLI: `aws ecr list-images --repository-name web`.
+
+---
+
+## 6. Route 53 — hosted zone
 
 Sáltate esto si ya tienes la hosted zone de tu dominio en Route 53.
 
@@ -212,25 +272,24 @@ aws route53 create-hosted-zone --name tudominio.com --caller-reference "$(date +
 
 ---
 
-## 5. ACM — certificado SSL
+## 7. ACM — certificado SSL
 
 **Consola**: Certificate Manager (**en `us-east-1`**, el ALB solo acepta
 certificados de esa región) → **Request certificate** → *Request a public
 certificate* → dominio `cloudpulse.tudominio.com` → validación **DNS**.
-Tras crearlo, clic en **Create records in Route 53** (AWS rellena el
-registro de validación automáticamente si la zona está en tu cuenta).
-Espera a que el estado pase a *Issued* (unos minutos).
+Clic en **Create records in Route 53** (si la zona está en tu cuenta, AWS
+rellena el registro de validación solo). Espera a que el estado pase a
+*Issued*.
 
 **CLI**:
 ```bash
 aws acm request-certificate --domain-name cloudpulse.tudominio.com \
   --validation-method DNS --region us-east-1
 
-# Consulta el registro CNAME de validacion que pide ACM:
 aws acm describe-certificate --certificate-arn <CERT_ARN> --region us-east-1 \
   --query 'Certificate.DomainValidationOptions[0].ResourceRecord'
 
-# Crealo en tu zona (sustituye NAME/VALUE por lo que devolvio el comando anterior):
+# Con el NAME/VALUE que devolvio el comando anterior:
 aws route53 change-resource-record-sets --hosted-zone-id <ZONE_ID> --change-batch '{
   "Changes": [{"Action": "CREATE", "ResourceRecordSet": {
     "Name": "<NAME>", "Type": "CNAME", "TTL": 60,
@@ -241,9 +300,9 @@ aws route53 change-resource-record-sets --hosted-zone-id <ZONE_ID> --change-batc
 
 ---
 
-## 6. Application Load Balancer
+## 8. Application Load Balancer
 
-### 6.1 Target groups (créalos antes que el ALB)
+### 8.1 Target groups (créalos antes que el ALB)
 
 **Consola**: EC2 → *Target groups* → **Create target group**, tres veces:
 
@@ -264,7 +323,7 @@ aws elbv2 create-target-group --name cloudpulse-web-tg \
 # docs-tg (target-type ip, health-check-path /docs/)
 ```
 
-### 6.2 El ALB
+### 8.2 El ALB
 
 **Consola**: EC2 → *Load balancers* → **Create load balancer** →
 Application Load Balancer → *Internet-facing* → subredes = las 2
@@ -291,7 +350,7 @@ aws elbv2 create-listener --load-balancer-arn <ALB_ARN> \
   --default-actions Type=forward,TargetGroupArn=<WEB_TG_ARN>
 ```
 
-### 6.3 Reglas de enrutamiento por path
+### 8.3 Reglas de enrutamiento por path
 
 **Consola**: selecciona el listener HTTPS:443 → **Manage rules → Add
 rule**:
@@ -311,7 +370,7 @@ aws elbv2 create-rule --listener-arn <HTTPS_LISTENER_ARN> --priority 2 \
   --actions Type=forward,TargetGroupArn=<DOCS_TG_ARN>
 ```
 
-### 6.4 Registro Alias en Route 53
+### 8.4 Registro Alias en Route 53
 
 **Consola**: Route 53 → tu hosted zone → **Create record** → nombre =
 tu dominio → tipo `A` → **Alias** → *Alias to Application Load Balancer* →
@@ -329,21 +388,18 @@ aws route53 change-resource-record-sets --hosted-zone-id <ZONE_ID> --change-batc
 
 ---
 
-## 7. IAM — roles de ECS
+## 9. IAM — roles de ECS
 
 **Consola**: IAM → *Roles* → **Create role**:
 
 - **`cloudpulse-ecs-instance-role`** — trusted entity: *AWS service* →
   *EC2* → adjunta la policy administrada
-  `AmazonEC2ContainerServiceforEC2Role`. Tras crearlo, IAM → *Roles* →
-  ábrelo → pestaña adicional no hace falta: EC2 lo usará como *instance
-  profile* (la consola crea el instance profile automáticamente con el
-  mismo nombre al asociarlo a una instancia/launch template).
+  `AmazonEC2ContainerServiceforEC2Role`.
 - **`cloudpulse-ecs-task-execution-role`** — trusted entity: *AWS
   service* → *Elastic Container Service* → *Elastic Container Service
   Task* → adjunta `AmazonECSTaskExecutionRolePolicy` + una inline policy
-  con permisos de `logs:CreateLogGroup`, `logs:CreateLogStream`,
-  `logs:PutLogEvents` sobre `arn:aws:logs:*:*:*`.
+  con `logs:CreateLogGroup`, `logs:CreateLogStream`, `logs:PutLogEvents`
+  sobre `arn:aws:logs:*:*:*`.
 
 **CLI**:
 ```bash
@@ -364,9 +420,9 @@ aws iam attach-role-policy --role-name cloudpulse-ecs-task-execution-role \
 
 ---
 
-## 8. ECS Cluster (EC2 + Fargate)
+## 10. ECS Cluster (EC2 + Fargate)
 
-### 8.1 Launch template + Auto Scaling Group
+### 10.1 Launch template + Auto Scaling Group
 
 **Consola**: EC2 → *Launch templates* → **Create launch template** →
 nombre `cloudpulse-ecs` → AMI: busca "Amazon ECS-Optimized Amazon Linux
@@ -382,9 +438,9 @@ echo ECS_CLUSTER=cloudpulse-cluster >> /etc/ecs/ecs.config
 Luego EC2 → *Auto Scaling Groups* → **Create Auto Scaling group** → usa
 el launch template → subredes = las 2 privadas → tamaño: min `2` /
 max `4` / deseada `2` → en *Advanced options*, activa *Protect from scale
-in* (lo necesita el Capacity Provider más adelante).
+in*.
 
-**CLI**: obtener el AMI ID vigente y crear ambos recursos.
+**CLI**:
 ```bash
 AMI_ID=$(aws ssm get-parameter \
   --name /aws/service/ecs/optimized-ami/amazon-linux-2/recommended \
@@ -405,16 +461,15 @@ aws autoscaling create-auto-scaling-group --auto-scaling-group-name cloudpulse-e
   --new-instances-protected-from-scale-in
 ```
 
-### 8.2 Cluster + Capacity Providers
+### 10.2 Cluster + Capacity Providers
 
 **Consola**: ECS → *Clusters* → **Create cluster** → nombre
 `cloudpulse-cluster` → *Infrastructure*: marca **Amazon EC2 instances**
-(elige el Auto Scaling Group `cloudpulse-ecs-asg`, Managed scaling
-*Enabled*, target capacity `100`) **y** **AWS Fargate** → *Monitoring*:
-activa **Container Insights**.
+(Auto Scaling Group `cloudpulse-ecs-asg`, Managed scaling *Enabled*,
+target capacity `100`) **y** **AWS Fargate** → *Monitoring*: activa
+**Container Insights**.
 
-**CLI** (la consola simplifica varios pasos; con la CLI se crean por
-separado):
+**CLI**:
 ```bash
 aws ecs put-account-setting --name containerInsights --value enabled
 
@@ -429,7 +484,7 @@ aws ecs create-cluster --cluster-name cloudpulse-cluster \
 
 ---
 
-## 9. CloudWatch — logs y alarmas
+## 11. CloudWatch — logs y alarmas
 
 **Consola**: CloudWatch → *Log groups* → **Create log group**, tres veces:
 `/ecs/webdef`, `/ecs/statusdef`, `/ecs/docsdef` → retención 30 días.
@@ -461,22 +516,21 @@ aws cloudwatch put-metric-alarm --alarm-name cloudpulse-cluster-memory-high \
 
 ---
 
-## 10. Task Definitions
+## 12. Task Definitions
 
 **Consola**: ECS → *Task definitions* → **Create new task definition**,
 tres veces (`webdef`, `statusdef` con *Launch type* EC2 / network mode
 `bridge`; `docsdef` con *Launch type* Fargate / network mode `awsvpc`).
 En cada una:
-- Task role: (ninguno necesario para este demo) · Task execution role:
-  `cloudpulse-ecs-task-execution-role`.
+- Task execution role: `cloudpulse-ecs-task-execution-role`.
 - CPU `0.5 vCPU` (512) · Memoria `1 GB` (1024).
-- Contenedor: imagen = tu URL de ECR + `:latest`, puerto contenedor `80`
-  (en `webdef`/`statusdef` el *host port* déjalo en `0`, dinámico).
-- Logging: driver `awslogs`, log group = el correspondiente creado en el
-  paso 9, región `us-east-1`, stream prefix `ecs`.
+- Contenedor: imagen = la URL de ECR del paso 5 + `:latest`, puerto
+  contenedor `80` (en `webdef`/`statusdef` el *host port* déjalo en `0`).
+- Logging: driver `awslogs`, log group = el creado en el paso 11, región
+  `us-east-1`, stream prefix `ecs`.
 
-**CLI** (ejemplo para `webdef`; repite ajustando nombre/networkMode/
-requiresCompatibilities para `statusdef` y `docsdef`):
+**CLI** (ejemplo `webdef`; repite ajustando nombre/networkMode/
+requiresCompatibilities/imagen para `statusdef` y `docsdef`):
 ```bash
 aws ecs register-task-definition --family webdef \
   --requires-compatibilities EC2 --network-mode bridge \
@@ -484,7 +538,7 @@ aws ecs register-task-definition --family webdef \
   --execution-role-arn <TASK_EXECUTION_ROLE_ARN> \
   --container-definitions '[{
     "name": "web",
-    "image": "<ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/web:latest",
+    "image": "<AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/web:latest",
     "essential": true, "cpu": 512, "memory": 1024,
     "portMappings": [{"containerPort": 80, "hostPort": 0, "protocol": "tcp"}],
     "logConfiguration": {"logDriver": "awslogs", "options": {
@@ -495,7 +549,7 @@ aws ecs register-task-definition --family webdef \
 
 ---
 
-## 11. ECS Services + autoescalado de servicio
+## 13. ECS Services + autoescalado de servicio
 
 **Consola**: ECS → tu cluster → *Services* → **Create**, tres veces:
 - `web` / `status`: launch type EC2, task definition correspondiente,
@@ -535,11 +589,35 @@ aws application-autoscaling put-scaling-policy --policy-name web-request-count-t
 
 ---
 
-## Y ahora, olvídalo
+## 14. Verificar que funciona
 
-Si has llegado hasta aquí a mano, ya tienes clara la mecánica de cada
-pieza. Bórralo todo (en orden inverso: servicios → cluster/ASG → ALB →
-ACM → Route 53 → ECR → security groups → VPC) y usa Terraform para
-cualquier cosa real — es exactamente para evitar repetir estos ~40 pasos
-manuales, sin margen de error de tipeo, para lo que existe
-`infrastructure/environments/prod`.
+- Espera 1-2 minutos a que las tareas pasen a `RUNNING` y los target
+  groups a `healthy` (EC2 → *Target groups* → pestaña *Targets*).
+- Visita `https://cloudpulse.tudominio.com/` → debe cargar la landing
+  (`web`).
+- Visita `https://cloudpulse.tudominio.com/status/` → debe cargar la
+  status page (`status`).
+- Visita `https://cloudpulse.tudominio.com/docs/` → debe cargar la
+  documentación (`docs`).
+- Si algo da 503: revisa el estado de los targets en el target group
+  correspondiente y los logs en CloudWatch (`/ecs/webdef`, etc.).
+
+---
+
+## 15. Y ahora, automatízalo
+
+Si has llegado hasta aquí a mano, ya tienes claro qué hace cada pieza.
+Bórralo todo (orden inverso: servicios → cluster/ASG → ALB → ACM →
+Route 53 → ECR → security groups → VPC) y usa Terraform + GitHub Actions
+para cualquier despliegue real:
+
+1. [`infrastructure/README.md`](infrastructure/README.md) — el mismo
+   resultado, con `terraform apply`, en unos pocos comandos.
+2. [`infrastructure/OIDC-SETUP.md`](infrastructure/OIDC-SETUP.md) — el
+   único paso que sigue siendo manual incluso con Terraform: el rol OIDC
+   de GitHub Actions.
+
+A partir de ahí, cada push dispara el pipeline
+([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)) y hace
+exactamente los pasos 5, 12, 13 y el `force-new-deployment` de esta guía,
+automáticamente.
