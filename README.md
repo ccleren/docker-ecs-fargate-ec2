@@ -155,7 +155,10 @@ Instrucciones detalladas paso a paso en
 ## 🔁 CI/CD
 
 Workflow único ([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)),
-disparado en push a `main`, con 3 jobs encadenados:
+con 3 jobs encadenados. Por defecto solo se dispara manualmente
+(`workflow_dispatch`) — el trigger automático en push a `main` está
+comentado en el propio archivo, listo para activar cuando exista el rol
+OIDC y el secret `AWS_ROLE_ARN`:
 
 1. **`build-and-push`** (matrix `web` / `status` / `docs`, en paralelo) —
    build de cada imagen y push a ECR con tag `latest` + SHA del commit.
@@ -186,8 +189,8 @@ terraform init && terraform plan && terraform apply
 aws ecs update-service --cluster cloudpulse-cluster --service web --force-new-deployment
 ```
 
-No es el flujo de uso real del repositorio, que siempre se dispara con un
-push a `main`.
+No es el flujo real de uso del repositorio, pensado para dispararse desde
+el propio pipeline.
 </details>
 
 ---

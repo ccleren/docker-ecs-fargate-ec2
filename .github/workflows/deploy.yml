@@ -1,9 +1,14 @@
 name: Deploy CloudPulse
 
 on:
-  push:
-    branches: [main]
+  # Disparo manual unicamente: este repositorio es una pieza de portfolio y
+  # no se despliega por defecto. Requiere el rol IAM OIDC y el secret
+  # AWS_ROLE_ARN configurados (ver infrastructure/README.md). Para que el
+  # pipeline vuelva a dispararse en cada push a main, descomenta el bloque
+  # de abajo una vez tengas esa infraestructura de credenciales lista.
   workflow_dispatch: {}
+  # push:
+  #   branches: [main]
 
 permissions:
   id-token: write   # necesario para OIDC (sin claves estaticas)

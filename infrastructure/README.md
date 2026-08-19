@@ -102,10 +102,10 @@ pueda completarse.
 
 ### 5. Build de las 3 apps y push a ECR
 
-Normalmente lo hace el workflow de CI/CD en cada push a `main` (ver
-[`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)). El
-equivalente manual está documentado en la sección CI/CD del
-[README general](../README.md).
+Lo hace el workflow de CI/CD ([`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)),
+disparado manualmente (`workflow_dispatch`) mientras el trigger automático
+en push a `main` esté comentado. El equivalente manual está documentado en
+la sección CI/CD del [README general](../README.md).
 
 ### 6. Force new deployment
 
