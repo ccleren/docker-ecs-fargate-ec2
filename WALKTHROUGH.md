@@ -234,11 +234,6 @@ aws ecr put-lifecycle-policy --repository-name web --lifecycle-policy-text '{
 Con los 3 repositorios ya creados, construye y sube cada app (`web`,
 `status`, `docs`) desde la raíz del repositorio:
 
-**No hay equivalente "clic en consola"** para este paso — construir
-imágenes es intrínsecamente un comando, no una acción de la consola de AWS
-(subirlas sí podrías hacerlo arrastrando un `.tar` desde algún sitio, pero
-nadie lo hace así; el flujo real siempre es `docker build` + `docker push`).
-
 ```bash
 aws ecr get-login-password --region us-east-1 \
   | docker login --username AWS --password-stdin <AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com
