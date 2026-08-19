@@ -18,7 +18,7 @@ Incluye una app de ejemplo completa: **CloudPulse**, una plataforma SaaS
 ficticia de monitorización de infraestructura, dividida en 3 microservicios
 independientes que ilustran el path-based routing de forma realista.
 
-![Vista previa de la app de ejemplo](img/web-preview.jpg)
+![Navegación entre los 3 microservicios con path-based routing](img/cloudpulse-routing-demo.gif)
 
 ---
 
