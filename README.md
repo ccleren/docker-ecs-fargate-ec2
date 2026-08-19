@@ -2,11 +2,12 @@
 
 ![Terraform](https://img.shields.io/badge/Terraform-1.6+-844FBA?logo=terraform&logoColor=white)
 ![AWS](https://img.shields.io/badge/AWS-ECS%20%7C%20Fargate%20%7C%20EC2-FF9900?logo=amazonaws&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Nginx-2496ED?logo=docker&logoColor=white)
 ![Security](https://img.shields.io/badge/Security-OIDC%20%7C%20no%20static%20keys-000000?logo=amazonaws&logoColor=white)
 ![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?logo=githubactions&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
-Arquitectura de contenedores en AWS con **Amazon ECS de tipos de
+Arquitectura de contenedores **Docker** en AWS con **Amazon ECS de tipos de
 lanzamiento mixtos (EC2 + Fargate)**, un **Application Load Balancer** con
 enrutamiento basado en rutas, autoescalado a dos niveles (servicio e
 infraestructura) y observabilidad con **CloudWatch** — todo definido con
@@ -27,8 +28,9 @@ independientes que ilustran el path-based routing de forma realista.
   ECS (cluster + task definitions + services), ALB, ACM, Route 53 y
   CloudWatch, en 10 módulos independientes.
 - 🐳 **3 microservicios de ejemplo** completos y desacoplados de la
-  infraestructura (`web`, `status`, `docs`) — contenedores Nginx sirviendo
-  contenido estático, listos para sustituir.
+  infraestructura (`web`, `status`, `docs`) — cada uno con su propio
+  `Dockerfile`, contenedores Nginx sirviendo contenido estático, listos
+  para sustituir.
 - ⚖️ **ECS con tipos de lanzamiento mixtos** — `web` y `status` sobre EC2
   (Capacity Provider con Auto Scaling Group), `docs` sobre Fargate.
 - 📈 **Autoescalado en dos niveles** — target tracking por servicio
@@ -194,7 +196,7 @@ push a `main`.
 
 **Infraestructura**: Terraform · AWS (VPC, ECS, EC2, Fargate, ALB, ECR,
 ACM, Route 53, CloudWatch, S3, DynamoDB)
-**Apps de ejemplo**: HTML · CSS · JS (sin frameworks) · Nginx
+**Apps de ejemplo**: HTML · CSS · JS (sin frameworks) · Docker · Nginx
 **CI/CD**: GitHub Actions · OIDC (sin credenciales estáticas)
 
 ---
