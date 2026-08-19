@@ -191,7 +191,7 @@ aws ecs update-service --cluster cloudpulse-cluster --service web --force-new-de
 
 Esto asume que la infraestructura ya existe. Si además quieres ver cómo se
 construiría cada pieza (VPC, ALB, ECS...) a mano, clic a clic en la consola,
-mira [`WALKTHROUGH.md`](WALKTHROUGH.md).
+mira [`GUIA.md`](GUIA.md).
 
 No es el flujo real de uso del repositorio, pensado para dispararse desde
 el propio pipeline.
@@ -214,7 +214,7 @@ ACM, Route 53, CloudWatch, S3, DynamoDB)
   a paso de la infraestructura, orden de aplicación de los módulos.
 - [`infrastructure/OIDC-SETUP.md`](infrastructure/OIDC-SETUP.md) — crear el
   rol IAM OIDC para GitHub Actions, con CLI o consola.
-- [`WALKTHROUGH.md`](WALKTHROUGH.md) — el proyecto entero de principio a
+- [`GUIA.md`](GUIA.md) — el proyecto entero de principio a
   fin, paso a paso a clic en la consola de AWS (con el comando de CLI
   equivalente en cada paso). Solo educativo.
 

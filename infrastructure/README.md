@@ -14,7 +14,7 @@ Terraform de este proyecto, organizado en 3 capas:
   módulos con otro `.tfvars`.
 
 ¿Prefieres ver qué crea cada módulo pero clic a clic en la consola de AWS
-en vez de en HCL? Está todo en [`WALKTHROUGH.md`](../WALKTHROUGH.md) —
+en vez de en HCL? Está todo en [`GUIA.md`](../GUIA.md) —
 el proyecto de principio a fin, solo con fines educativos, el despliegue
 real sigue siendo con Terraform.
 
