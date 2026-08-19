@@ -216,18 +216,4 @@ ACM, Route 53, CloudWatch, S3, DynamoDB)
   rol IAM OIDC para GitHub Actions, con CLI o consola.
 - [`WALKTHROUGH.md`](WALKTHROUGH.md) — el proyecto entero de principio a
   fin, paso a paso a clic en la consola de AWS (con el comando de CLI
-  equivalente en cada paso). Solo educativo.
-
----
-
-## Fuera de alcance
-
-Bases de datos, WAF/Shield/GuardDuty, Service Mesh, librerías de
-visualización de datos en `status` (deliberado, para no solapar con otros
-proyectos del portfolio) y múltiples entornos activos simultáneamente (la
-estructura admite `dev`/`staging` mediante `environments/`, pero solo se
-despliega `prod` por defecto).
-
-## Licencia
-
-[MIT](LICENSE)
+  equivalente en cada paso).
