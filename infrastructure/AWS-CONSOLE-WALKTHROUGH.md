@@ -1,6 +1,6 @@
 # 🖱️ CloudPulse a mano, desde la consola de AWS
 
-Este documento es **puramente educativo**: reconstruye, clic a clic en la
+Este documento es **puramente informativo**: reconstruye, clic a clic en la
 consola de AWS, exactamente lo que crean los 10 módulos de Terraform de
 este repositorio — para entender qué hace `terraform apply` por debajo.
 
@@ -8,11 +8,11 @@ este repositorio — para entender qué hace `terraform apply` por debajo.
 > se despliega con Terraform (`infrastructure/environments/prod`) y el
 > workflow de CI/CD. Si sigues esta guía y luego quieres traspasar la
 > infraestructura a Terraform, tendrías que hacer `terraform import` de cada
-> recurso — no lo cubrimos aquí. Úsala para entender el "por qué" de cada
+> recurso. Úsalo para entender el "por qué" de cada
 > pieza, o para reconstruir una versión mínima de prueba sin tocar Terraform.
 
 Cada paso incluye el camino de clics en la consola **y** el comando
-equivalente de AWS CLI, para que veas la correspondencia entre ambos.
+equivalente de AWS CLI.
 Todos los comandos asumen la región `us-east-1` — cámbiala si usas otra.
 
 ---
@@ -540,6 +540,4 @@ aws application-autoscaling put-scaling-policy --policy-name web-request-count-t
 Si has llegado hasta aquí a mano, ya tienes clara la mecánica de cada
 pieza. Bórralo todo (en orden inverso: servicios → cluster/ASG → ALB →
 ACM → Route 53 → ECR → security groups → VPC) y usa Terraform para
-cualquier cosa real — es exactamente para evitar repetir estos ~40 pasos
-manuales, sin margen de error de tipeo, para lo que existe
-`infrastructure/environments/prod`.
+cualquier cosa real.
