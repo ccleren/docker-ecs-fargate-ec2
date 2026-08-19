@@ -1,24 +1,22 @@
 # 🖱️ CloudPulse de principio a fin — clic a clic / comando a comando
 
-Esta guía construye **todo el proyecto**, desde cero hasta tener las 3 apps
-sirviendo detrás del ALB — sin usar Terraform. En cada paso tienes el camino
-de clics en la consola de AWS **y** el comando de AWS CLI equivalente, para
-entender exactamente qué hace cada pieza.
+Esta guía es **puramente informativa**: construye todo el proyecto, desde
+cero hasta tener las 3 apps sirviendo detrás del ALB, sin usar Terraform —
+para entender exactamente qué hace cada pieza.
 
-> ⚠️ **Esto es material educativo, no el método de despliegue real del
-> repositorio.** El proyecto se despliega con Terraform
-> (`infrastructure/environments/prod`) automatizado por GitHub Actions —
-> ver [`README.md`](README.md) e [`infrastructure/README.md`](infrastructure/README.md).
-> Sigue esta guía para entender el "por qué" de cada recurso, para una
-> prueba puntual, o como referencia si algo falla y necesitas depurarlo
-> manualmente. Si repites estos pasos y luego quieres pasar la
-> infraestructura a Terraform, tendrías que hacer `terraform import` de
-> cada recurso — no se cubre aquí.
+> ⚠️ **No es el método de despliegue real de este proyecto.** El repositorio
+> se despliega con Terraform (`infrastructure/environments/prod`) y el
+> workflow de CI/CD — ver [`README.md`](README.md) e
+> [`infrastructure/README.md`](infrastructure/README.md). Si sigues esta
+> guía y luego quieres traspasar la infraestructura a Terraform, tendrías
+> que hacer `terraform import` de cada recurso. Úsala para entender el
+> "por qué" de cada pieza, o para reconstruir una versión mínima de prueba
+> sin tocar Terraform.
 
-Todos los comandos asumen la región `us-east-1`; cámbiala si usas otra.
-Guarda cada ID que generes (VPC ID, subnet IDs, ARNs...) — los necesitarás
-en pasos posteriores. Casi todos los `create-*` de la CLI devuelven el ID
-en la respuesta JSON.
+Cada paso incluye el camino de clics en la consola y el comando
+equivalente de AWS CLI. Todos los comandos asumen la región `us-east-1`
+— cámbiala si usas otra. Guarda cada ID que generes (VPC ID, subnet IDs,
+ARNs...): los necesitarás en pasos posteriores.
 
 ---
 
