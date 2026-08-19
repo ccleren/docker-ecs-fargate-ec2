@@ -13,6 +13,11 @@ Terraform de este proyecto, organizado en 3 capas:
   `environments/dev` o `environments/staging` reutilizando los mismos
   módulos con otro `.tfvars`.
 
+¿Prefieres ver qué crea cada módulo pero clic a clic en la consola de AWS
+en vez de en HCL? Está todo en
+[`AWS-CONSOLE-WALKTHROUGH.md`](AWS-CONSOLE-WALKTHROUGH.md) — solo con
+fines educativos, el despliegue real sigue siendo con Terraform.
+
 ## Orden de aplicación
 
 Terraform resuelve el orden automáticamente por el grafo de dependencias
