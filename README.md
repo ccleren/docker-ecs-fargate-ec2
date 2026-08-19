@@ -1,4 +1,4 @@
-# 🏗️ CloudPulse — ECS Multi-Servicio (EC2 + Fargate) con Path-Based Routing
+# 🏗️ CloudPulse — ECS Multi-Servicio (EC2 + Fargate)
 
 ![Terraform](https://img.shields.io/badge/Terraform-1.6+-844FBA?logo=terraform&logoColor=white)
 ![AWS](https://img.shields.io/badge/AWS-ECS%20%7C%20Fargate%20%7C%20EC2-FF9900?logo=amazonaws&logoColor=white)
