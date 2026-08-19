@@ -132,7 +132,7 @@ completos.
 1. **Bootstrap del backend remoto** — crea el bucket S3 y la tabla DynamoDB
    para el state de Terraform (`infrastructure/bootstrap`).
 2. **Rol IAM para GitHub Actions (OIDC)** — se crea una única vez, fuera de
-   Terraform (ver [`infrastructure/README.md`](infrastructure/README.md)).
+   Terraform (ver [`infrastructure/OIDC-SETUP.md`](infrastructure/OIDC-SETUP.md)).
 3. **Desplegar infraestructura** — `terraform init / plan / apply` sobre
    `infrastructure/environments/prod`.
 4. **Build de las 3 apps y push a ECR** — manual o, normalmente, a través
@@ -208,6 +208,8 @@ ACM, Route 53, CloudWatch, S3, DynamoDB)
 
 - [`infrastructure/README.md`](infrastructure/README.md) — despliegue paso
   a paso de la infraestructura, orden de aplicación de los módulos.
+- [`infrastructure/OIDC-SETUP.md`](infrastructure/OIDC-SETUP.md) — crear el
+  rol IAM OIDC para GitHub Actions, con CLI o consola.
 
 ---
 

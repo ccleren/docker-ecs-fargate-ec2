@@ -62,19 +62,10 @@ El pipeline asume un rol mediante OIDC — no usa claves de acceso estáticas. E
 rol es la única pieza de infraestructura que **no** gestiona el Terraform
 de este repositorio (problema de huevo y gallina: el pipeline no puede
 crearse a sí mismo el permiso que necesita para correr). Se crea una única
-vez, manualmente o con un script/Terraform aparte:
+vez, con tus credenciales de administrador, con la CLI o desde la consola.
 
-1. Crea el proveedor OIDC de GitHub en IAM (si tu cuenta no lo tiene ya):
-   `token.actions.githubusercontent.com`, audience `sts.amazonaws.com`.
-2. Crea un rol con esa identidad como trusted entity, con el `sub` acotado
-   a tu repositorio, por ejemplo:
-   `repo:<tu-usuario>/<tu-repo>:ref:refs/heads/main`.
-3. Adjunta permisos para: push/pull en ECR, `ecs:UpdateService` +
-   `ecs:DescribeServices`, y los permisos necesarios para que Terraform
-   gestione VPC/ALB/ECS/IAM/Route53/ACM/CloudWatch, además de
-   lectura/escritura sobre el bucket S3 y la tabla DynamoDB del backend
-   remoto.
-4. Copia el ARN del rol al secret `AWS_ROLE_ARN` del repositorio en GitHub.
+Guía completa, con comandos y política IAM incluidos, en
+[`OIDC-SETUP.md`](OIDC-SETUP.md).
 
 ### 3. Configurar variables
 
