@@ -1,0 +1,114 @@
+name: Deploy CloudPulse
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write   # necesario para OIDC (sin claves estaticas)
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  ECS_CLUSTER: cloudpulse-cluster
+  TERRAFORM_VERSION: "1.9.8"
+  TF_WORKDIR: infrastructure/environments/prod
+
+jobs:
+  # ---------------------------------------------------------------------
+  # 1) Build de las 3 imagenes Docker + push a ECR (tag latest + SHA)
+  # ---------------------------------------------------------------------
+  build-and-push:
+    name: Build & push (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [web, status, docs]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag y push de la imagen
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          REPOSITORY: ${{ matrix.service }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build \
+            -t "$REGISTRY/$REPOSITORY:$IMAGE_TAG" \
+            -t "$REGISTRY/$REPOSITORY:latest" \
+            "./apps/${{ matrix.service }}"
+          docker push "$REGISTRY/$REPOSITORY:$IMAGE_TAG"
+          docker push "$REGISTRY/$REPOSITORY:latest"
+
+  # ---------------------------------------------------------------------
+  # 2) terraform init / plan / apply sobre environments/prod
+  # ---------------------------------------------------------------------
+  deploy-infrastructure:
+    name: Terraform apply
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: production
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKDIR }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Terraform init
+        run: terraform init -input=false
+
+      - name: Terraform plan
+        run: |
+          terraform plan -input=false -out=tfplan \
+            -var="image_tag=${{ github.sha }}" \
+            -var="domain_name=${{ vars.DOMAIN_NAME || 'cloudpulse.example.com' }}"
+
+      - name: Terraform apply
+        run: terraform apply -input=false -auto-approve tfplan
+
+  # ---------------------------------------------------------------------
+  # 3) Forzar que los 3 servicios ECS recojan la imagen recien publicada
+  # ---------------------------------------------------------------------
+  force-new-deployment:
+    name: Force new deployment
+    needs: deploy-infrastructure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Force new deployment (web, status, docs)
+        run: |
+          for service in web status docs; do
+            aws ecs update-service \
+              --cluster "${{ env.ECS_CLUSTER }}" \
+              --service "$service" \
+              --force-new-deployment
+          done

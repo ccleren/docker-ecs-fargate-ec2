@@ -1,0 +1,34 @@
+# Copia este archivo como terraform.tfvars y ajusta los valores.
+# terraform.tfvars esta en .gitignore: nunca se sube al repositorio.
+
+aws_region  = "us-east-1"
+name_prefix = "cloudpulse"
+environment = "prod"
+
+availability_zones = ["us-east-1a", "us-east-1b"]
+
+# Dominio real que controlas. Si ya tienes la hosted zone en Route 53,
+# deja create_hosted_zone = false; si quieres que Terraform la cree,
+# ponlo a true y despues configura los name_servers (output
+# route53_name_servers) en tu registrador de dominio.
+domain_name        = "cloudpulse.tudominio.com"
+create_hosted_zone = false
+
+# El pipeline de CI/CD sobreescribe este valor con el SHA del commit
+# (terraform apply -var="image_tag=<sha>"). Localmente, latest.
+image_tag = "latest"
+
+# Acceso SSH opcional para debugging. Mantener desactivado salvo necesidad puntual.
+enable_workstation_sg = false
+allowed_ssh_cidr      = "0.0.0.0/32"
+
+ec2_instance_type = "t2.medium"
+ec2_asg_min_size  = 2
+ec2_asg_max_size  = 4
+
+service_min_capacity = 2
+service_max_capacity = 8
+
+cpu_alarm_threshold    = 80
+memory_alarm_threshold = 80
+log_retention_days     = 30
